@@ -69,4 +69,25 @@ function homogenousMatrix = FindTransformationMatrixWithPoints(points, points2)
             count = count + 1;
         end
     end
+    
+    %For sanity checking, transform a random point and see if it is correct!
+    testPointNum = randi(4);
+    testPoint = points(testPointNum,:);
+    testPointPrime = points2(testPointNum, :);
+    transformTestPoint = TransformPoint(testPoint, homogenousMatrix);
+    isTransformationCorrect = isequal(testPointPrime, transformTestPoint);
+    if (~isTransformationCorrect) 
+        disp("Something went wrong finding the transformation matrix!");
+    end
+end
+
+function transformedPoint = TransformPoint(point, transformationMatrix)
+    %Assuming points are coming in as (x,y)
+    homogenousPoint = [
+            point(1);
+            point(2);
+            1
+        ];
+    homogenousTransformedPoint = transformationMatrix * homogenousPoint;
+    transformedPoint = [round(homogenousTransformedPoint(1,:)/homogenousTransformedPoint(3,:)), round(homogenousTransformedPoint(2,:)/homogenousTransformedPoint(3,:))];
 end
