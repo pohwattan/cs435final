@@ -138,6 +138,8 @@ function stitchedImage = StitchImages(baseImage, transformedImage, transformatio
     stitchedImage = uint8(zeros(stitchedImageHeight, stitchedImageWidth, 3));
 
     for y = 1:stitchedImageHeight
+        clc;
+        disp("Stitching Progress = " + round((y/stitchedImageHeight)*100) + "%");
         for x = 1:stitchedImageWidth
             if (minTransformedX < 1)
                 baseImageX = x + minTransformedX;
