@@ -12,10 +12,10 @@ im2 = imrotate(im2, -90);
 
 [imMarked, im2Marked, points, points2] = point_correspondences(im, im2);
 
-figure(1);
-imshow(im);
-figure(2);
-imshow(im2);
+% figure(1);
+% imshow(im);
+% figure(2);
+% imshow(im2);
 
 %%%%%%%%%%%%%%
 % QUESTION 1 %
@@ -23,13 +23,18 @@ imshow(im2);
 figure('Name','Point Correspondence Side-by-Side', 'FileName','PointCorrespondence.jpg');
 imshowpair(imMarked,im2Marked,'montage');
 
-%%%%%%%%%%%%%%
-% QUESTION 2 %
-%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% QUESTION 2 by Andrew Grier %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 transformationMatrix = FindTransformationMatrixWithPoints(points, points2);
 stitchedImage = StitchImages(im, im2, transformationMatrix);
 figure('Name','Stitched Image', 'FileName','StitchedImage.jpg');
 imshow(stitchedImage);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% QUESTION 6 by Andrew Grier %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 % 1 (10 points) Hard Coding Point Correspondences
 function [im, im2, points, points2] = point_correspondences(im, im2)
@@ -113,13 +118,14 @@ function stitchedImage = StitchImages(baseImage, transformedImage, transformatio
     maxTransformedY = max(transformedImageTransformedCornerPoints(2,2), transformedImageTransformedCornerPoints(4,2));
     minTransformedX = min(transformedImageTransformedCornerPoints(1,1), transformedImageTransformedCornerPoints(2,1));
     maxTransformedX = max(transformedImageTransformedCornerPoints(3,1), transformedImageTransformedCornerPoints(4,1));
-    transformedImageTransformedHeight = maxTransformedY - minTransformedY;
-    transformedImageTransformedWidth = maxTransformedX - minTransformedX;
+    % transformedImageTransformedHeight = maxTransformedY - minTransformedY;
+    % transformedImageTransformedWidth = maxTransformedX - minTransformedX;
+    
     minBaseImageY = 0;
     maxBaseImageY = size(baseImage, 1);
     minBaseImageX = 0;
     maxBaseImageX = size(baseImage, 2);
-    baseImageHeight = size(baseImage, 1);
+    % baseImageHeight = size(baseImage, 1);
     baseImageWidth = size(baseImage, 2);
     
     %Setup canvas for the stitched image
