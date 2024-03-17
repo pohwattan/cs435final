@@ -26,9 +26,11 @@ imshow(stitchedImage);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 3 by Nick Pohwat %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-pyramid = image_pyramids(im);
-figure('Name','Scale-Space Image Pyramid', 'FileName','ImagePyramid.jpg');
-show_pyramid(pyramid);
+pyramids = image_pyramids(im, im2);
+for i = 1:length(pyramids)
+    figure('Name', ['Scale-Space Image Pyramid ' num2str(i)], 'FileName', ['ImagePyramid' num2str(i) '.jpg']);
+    show_pyramids(pyramids{i});
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 6 by Andrew Grier %
@@ -192,33 +194,41 @@ function blendedPointColors = BlendPointColors (point1Colors, point2Colors, alph
 end
 
 % 3 (10 points) Create Scale-Space Image Pyramids
-function pyramid = image_pyramids(im)
-    if size(im, 3) == 3
-        im = (0.2989*im(:,:,1)) + (0.5870*im(:,:,2)) + (0.1140*im(:,:,3));
-    end
-
+function pyramids = image_pyramids(varargin)
     kernel = @(sigma) ceil(3*sigma)*2+1;
-
     m_scales = 5;
     n_octaves = 4;
-
-    pyramid = cell(n_octaves, m_scales);
-    for n = 1:n_octaves
-        for m = 1:m_scales
-            sigma = 2^(n-1) * sqrt(2)^(m-1) * 1.6;
-            pyramid{n, m} = imgaussfilt(im, sigma, 'FilterSize', kernel(sigma));
+    
+    pyramids = cell(length(varargin), 1);
+    for i = 1:length(varargin)
+        im = varargin{i};
+        if size(im, 3) == 3
+            im = (0.2989*im(:,:,1)) + (0.5870*im(:,:,2)) + (0.1140*im(:,:,3));
         end
-        im = im(1:2:end, 1:2:end);
+
+        pyramid = cell(n_octaves, m_scales);
+        for n = 1:n_octaves
+            for m = 1:m_scales
+                sigma = 2^(n-1) * sqrt(2)^(m-1) * 1.6;
+                pyramid{n, m} = imgaussfilt(im, sigma, 'FilterSize', kernel(sigma));
+            end
+            im = im(1:2:end, 1:2:end);
+        end
+        pyramids{i} = pyramid;
     end
 end
 
-function show_pyramid(pyramid)
-    [height, width] = size(pyramid);
-    for n = 1:height
-        for m = 1:width
-            subplot(height, width, m + ((n-1) * width));
-            imshow(pyramid{n, m});
-            axis on;
+function show_pyramids(varargin)
+    for i = 1:length(varargin)
+        pyramid = varargin{i};
+        [height, width] = size(pyramid);
+        for n = 1:height
+            for m = 1:width
+                subplot(height, width, m + ((n-1) * width));
+                imshow(pyramid{n, m});
+                axis on;
+            end
         end
     end
 end
+
