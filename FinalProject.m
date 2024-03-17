@@ -1,5 +1,3 @@
-% PLEASE CHANGE THIS CODE IT IS UGLY
-
 clear variables;
 close all;
 
@@ -10,16 +8,10 @@ im2 = imread("second.jpg");
 im = imrotate(im, -90);
 im2 = imrotate(im2, -90);
 
-[imMarked, im2Marked, points, points2] = point_correspondences(im, im2);
-
-% figure(1);
-% imshow(im);
-% figure(2);
-% imshow(im2);
-
 %%%%%%%%%%%%%%
 % QUESTION 1 %
 %%%%%%%%%%%%%%
+[imMarked, im2Marked, points, points2] = point_correspondences(im, im2);
 figure('Name','Point Correspondence Side-by-Side', 'FileName','PointCorrespondence.jpg');
 imshowpair(imMarked,im2Marked,'montage');
 
@@ -31,6 +23,13 @@ stitchedImage = StitchImages(im, im2, transformationMatrix);
 figure('Name','Stitched Image', 'FileName','StitchedImage.jpg');
 imshow(stitchedImage);
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% QUESTION 3 by Nick Pohwat %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+pyramid = image_pyramids(im);
+figure('Name','Scale-Space Image Pyramid', 'FileName','ImagePyramid.jpg');
+show_pyramid(pyramid);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 6 by Andrew Grier %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -38,9 +37,9 @@ imshow(stitchedImage);
 
 % 1 (10 points) Hard Coding Point Correspondences
 function [im, im2, points, points2] = point_correspondences(im, im2)
-    points = [2188 943; 1193 2036; 1125 3592; 2660 3585];
-    points2 = [1541 1024; 463 2026; 257 3668; 1774 3577];
-    radius = 20;
+    points = [545 238; 299 510; 665 896; 281 896];
+    points2 = [383 258; 115 506; 443 896; 65 918];
+    radius = 8;
     colors = {'red', 'yellow', 'blue', 'green'};
     for i = 1:size(points,1)
         im = insertShape(im, 'FilledCircle', [points(i,:) radius], 'Color', colors{i});
@@ -190,4 +189,36 @@ end
 
 function blendedPointColors = BlendPointColors (point1Colors, point2Colors, alpha)
     blendedPointColors = [point1Colors(1)*alpha+point2Colors(1)*(1-alpha) point1Colors(2)*alpha+point2Colors(2)*(1-alpha) point1Colors(3)*alpha+point2Colors(3)*(1-alpha)];
+end
+
+% 3 (10 points) Create Scale-Space Image Pyramids
+function pyramid = image_pyramids(im)
+    if size(im, 3) == 3
+        im = (0.2989*im(:,:,1)) + (0.5870*im(:,:,2)) + (0.1140*im(:,:,3));
+    end
+
+    kernel = @(sigma) ceil(3*sigma)*2+1;
+
+    m_scales = 5;
+    n_octaves = 4;
+
+    pyramid = cell(n_octaves, m_scales);
+    for n = 1:n_octaves
+        for m = 1:m_scales
+            sigma = 2^(n-1) * sqrt(2)^(m-1) * 1.6;
+            pyramid{n, m} = imgaussfilt(im, sigma, 'FilterSize', kernel(sigma));
+        end
+        im = im(1:2:end, 1:2:end);
+    end
+end
+
+function show_pyramid(pyramid)
+    [height, width] = size(pyramid);
+    for n = 1:height
+        for m = 1:width
+            subplot(height, width, m + ((n-1) * width));
+            imshow(pyramid{n, m});
+            axis on;
+        end
+    end
 end
