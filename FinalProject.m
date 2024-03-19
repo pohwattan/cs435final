@@ -26,7 +26,7 @@ imshow(stitchedImage);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 3 by Nick Pohwat %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-pyramids = image_pyramids(im, im2);
+[pyramids, DoGs] = image_pyramids(im, im2);
 for i = 1:length(pyramids)
     figure('Name', ['Scale-Space Image Pyramid ' num2str(i)], 'FileName', ['ImagePyramid' num2str(i) '.jpg']);
     show_pyramids(pyramids{i});
@@ -35,10 +35,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 4 by Nick Pohwat and Andrew Grier %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[all_extrema_image, pruned_extrema_image, remaining_extrema] = local_maximas(pyramids{1});
+[all_extrema_image, pruned_extrema_image, remaining_extrema] = local_maximas(DoGs{1}, pyramids{1}{1, 1});
 figure('Name','Finding the Local Maximas 1', 'FileName','LocalMaximas1.jpg');
 imshowpair(all_extrema_image,pruned_extrema_image,'montage');
-[all_extrema_image2, pruned_extrema_image2, remaining_extrema2] = local_maximas(pyramids{2});
+[all_extrema_image2, pruned_extrema_image2, remaining_extrema2] = local_maximas(DoGs{2}, pyramids{2}{1, 1});
 figure('Name','Finding the Local Maximas 2', 'FileName','LocalMaximas2.jpg');
 imshowpair(all_extrema_image2,pruned_extrema_image2,'montage');
 
@@ -211,28 +211,33 @@ function blendedPointColors = BlendPointColors (point1Colors, point2Colors, alph
 end
 
 % 3 (10 points) Create Scale-Space Image Pyramids
-function pyramids = image_pyramids(varargin)
-    filterSize = @(sigma) ceil(3*sigma)*2+1;
+function [pyramids, DoGs] = image_pyramids(varargin)
+    kernel = @(sigma) ceil(3*sigma)*2+1;
     m_scales = 5;
     n_octaves = 4;
 
     pyramids = cell(length(varargin), 1);
+    DoGs = cell(length(varargin), 1);
     for i = 1:length(varargin)
-        im = varargin{i};
+        im = double(varargin{i}) / 255;
         if size(im, 3) == 3
             im = (0.2989*im(:,:,1)) + (0.5870*im(:,:,2)) + (0.1140*im(:,:,3));
         end
 
         pyramid = cell(n_octaves, m_scales);
+        DoG = cell(n_octaves, m_scales-1);
         for n = 1:n_octaves
-            k = sqrt(2);
             for m = 1:m_scales
-                sigma = 2^(n-1) * k^(m-1) * 1.6;
-                pyramid{n, m} = imgaussfilt(im, sigma, 'FilterSize', filterSize(sigma));
+                sigma = 2^(n-1) * sqrt(2)^(m-1) * 1.6;
+                pyramid{n, m} = imgaussfilt(im, sigma, 'FilterSize', kernel(sigma));
+                if m >= 2
+                    DoG{n,m-1} = pyramid{n, m-1} - pyramid{n, m};
+                end
             end
             im = im(1:2:end, 1:2:end);
         end
         pyramids{i} = pyramid;
+        DoGs{i} = DoG;
     end
 end
 
@@ -250,28 +255,96 @@ function show_pyramids(varargin)
     end
 end
 
+function [extremaValue, extremaLocation] = FindMatrixExtrema(inputMatrix, mode)
+    matrixHeight = size(inputMatrix, 1);
+    matrixWidth = size(inputMatrix, 2);
+    matrixDepth = size(inputMatrix, 3);
+    extremaValue = inputMatrix(2,2,2);
+    extremaLocation = [2,2,2];
+    for y = 1:matrixHeight
+        for x = 1:matrixWidth
+            for z = 1:matrixDepth
+                if (mode == "max")
+                    if inputMatrix(x,y,z) > extremaValue
+                        extremaValue = inputMatrix(x,y,z);
+                        extremaLocation = [x,y,z];
+                    end
+                elseif (mode == "min")
+                    if inputMatrix(x,y,z) < extremaValue
+                        extremaValue = inputMatrix(x,y,z);
+                        extremaLocation = [x,y,z];
+                    end
+                else
+                    disp("Something went wrong with MinMaxExtrema, could not recognize mode!");
+                end
+            end
+        end
+    end
+end
+
+function isCurrentPointExtrema = IsCurrentPointExtrema(inputMatrix, mode)
+    matrixHeight = size(inputMatrix, 1);
+    matrixWidth = size(inputMatrix, 2);
+    matrixDepth = size(inputMatrix, 3);
+    currentValue = inputMatrix(2,2,2);
+    isCurrentPointExtrema = false;
+    for y = 1:matrixHeight
+        for x = 1:matrixWidth
+            for z = 1:matrixDepth
+                if (x == 2 && y == 2 && z == 2)
+                    continue
+                end
+
+                if (mode == "max")
+                    if inputMatrix(x,y,z) > currentValue
+                        isCurrentPointExtrema = false;
+                        return;
+                    end
+                elseif (mode == "min")
+                    if inputMatrix(x,y,z) < currentValue
+                        isCurrentPointExtrema = false;
+                        return;
+                    end
+                else
+                    disp("Something went wrong with MinMaxExtrema, could not recognize mode!");
+                end
+            end
+        end
+    end
+    isCurrentPointExtrema = true;
+end
+
 % 4 (10 points) Finding the Local Maximas
-function [all_extrema_image, pruned_extrema_image, pruned_extrema_bits] = local_maximas(pyramid)
-    all_extrema_image = pyramid{1, 1};
-    pruned_extrema_image = pyramid{1, 1};
+function [all_extrema_image, pruned_extrema_image, pruned_extrema_bits] = local_maximas(DoGPyramid, baseImage)
+    all_extrema_image = DoGPyramid{1, 1};
+    pruned_extrema_image = DoGPyramid{1, 1};
     location_multiplier = @(octave) 2^(octave - 1);
     all_extremas_bits = zeros(size(all_extrema_image));
 
-    for octave = 1:size(pyramid, 1)
-        for scale = 2:size(pyramid, 2) - 1
-            scale_above = pyramid{octave,scale-1};
-            scale_current = pyramid{octave,scale};
-            scale_below = pyramid{octave,scale+1};
+    for octave = 1:size(DoGPyramid, 1)
+        for scale = 2:size(DoGPyramid, 2) - 1
+            scale_above = DoGPyramid{octave,scale-1};
+            scale_current = DoGPyramid{octave,scale};
+            scale_below = DoGPyramid{octave,scale+1};
             for height = 2:size(scale_current,1)-1
                 for width = 2:size(scale_current,2)-1
-                    window = [scale_above(height-1:height+1, width-1:width+1);
-                              scale_current(height-1:height+1, width-1:width+1);
-                              scale_below(height-1:height+1, width-1:width+1)];
+                    window = zeros(3,3,3);
+                    window(:,:,1) = scale_above(height-1:height+1, width-1:width+1);
+                    window(:,:,2) = scale_current(height-1:height+1, width-1:width+1);
+                    window(:,:,3) = scale_below(height-1:height+1, width-1:width+1);
+                    
+                    
+                    isCurrentPointMax = IsCurrentPointExtrema(window, "max");
+                    isCurrentPointMin = IsCurrentPointExtrema(window, "min");
 
-                    max_val = max(window(:));
-                    min_val = min(window(:));
-
-                    if scale_current(height, width) == max_val || scale_current(height, width) == min_val
+                    % imageSpace_max_loc_x = (max_loc(2) - 2) + width * location_multiplier(octave);
+                    % imageSpace_max_loc_y = (max_loc(1) - 2) + height * location_multiplier(octave);
+                    % all_extremas_bits(imageSpace_max_loc_y, imageSpace_max_loc_x) = 1;
+                    % 
+                    % imageSpace_min_loc_x = (min_loc(2) - 2) + width * location_multiplier(octave);
+                    % imageSpace_min_loc_y = (min_loc(1) - 2) + height * location_multiplier(octave);
+                    % all_extremas_bits(imageSpace_min_loc_y, imageSpace_min_loc_x) = 1;
+                    if (isCurrentPointMax || isCurrentPointMin)
                         scaled_height = height * location_multiplier(octave);
                         scaled_width = width * location_multiplier(octave);
                         all_extremas_bits(scaled_height, scaled_width) = 1;
@@ -281,14 +354,13 @@ function [all_extrema_image, pruned_extrema_image, pruned_extrema_bits] = local_
         end
     end
     [extrema_height, extrema_width] = find(all_extremas_bits == 1);
-    all_extrema_image = insertShape(all_extrema_image, 'Circle', [extrema_width, extrema_height, ones(length(extrema_width), 1)*5], 'Color', 'red');
+    all_extrema_image = insertShape(baseImage, 'Circle', [extrema_width, extrema_height, ones(length(extrema_width), 1)*5], 'Color', 'red');
 
     pruned_extrema_bits = all_extremas_bits;
 
-    [extrema_height, extrema_width] = find(pruned_extrema_bits == 1);
-    edges = edge(pruned_extrema_image, 'Canny');
+    edgeBits = edge(pruned_extrema_image, 'Canny');
     for i = 1:length(extrema_height)
-        if edges(extrema_height(i), extrema_width(i))
+        if (edgeBits(extrema_height(i), extrema_width(i)) == 1)
             pruned_extrema_bits(extrema_height(i), extrema_width(i)) = 0;
         end
     end
@@ -299,18 +371,19 @@ function [all_extrema_image, pruned_extrema_image, pruned_extrema_bits] = local_
     pruned_extrema_bits(:, 1:border_distance) = 0;
     pruned_extrema_bits(:, end-border_distance+1:end) = 0;
 
-    std_dev_threshold = 0.7;
+    std_dev_threshold = 0.03;
     patch_size = 9;
     patch_radius = floor(patch_size / 2);
-    [extrema_height, extrema_width] = find(pruned_extrema_bits == 1);
-    for i = 1:length(extrema_height)
-        patch = pruned_extrema_image(extrema_height(i) - patch_radius:extrema_height(i) + patch_radius,extrema_width(i) - patch_radius:extrema_width(i) + patch_radius);
+
+    [pruned_extrema_height, pruned_extrema_width] = find(pruned_extrema_bits == 1);
+    for i = 1:length(pruned_extrema_height)
+        patch = pruned_extrema_image(pruned_extrema_height(i) - patch_radius:pruned_extrema_height(i) + patch_radius,pruned_extrema_width(i) - patch_radius:pruned_extrema_width(i) + patch_radius);
         patch = double(patch(:));
         if std(patch(:)) < std_dev_threshold
-            pruned_extrema_bits(extrema_height(i), extrema_width(i)) = 0;
+            pruned_extrema_bits(pruned_extrema_height(i), pruned_extrema_width(i)) = 0;
         end
     end
     
-    [extrema_height, extrema_width] = find(pruned_extrema_bits == 1);
-    pruned_extrema_image = insertShape(pruned_extrema_image, 'Circle', [extrema_width, extrema_height, ones(length(extrema_width), 1)*5], 'Color', 'red');
+    [pruned_extrema_height, pruned_extrema_width] = find(pruned_extrema_bits == 1);
+    pruned_extrema_image = insertShape(baseImage, 'Circle', [pruned_extrema_width, pruned_extrema_height, ones(length(pruned_extrema_width), 1)*5], 'Color', 'red');
 end
