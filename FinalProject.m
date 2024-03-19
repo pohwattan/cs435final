@@ -32,6 +32,23 @@ for i = 1:length(pyramids)
     show_pyramids(pyramids{i});
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% QUESTION 4 by Nick Pohwat and Andrew Grier %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+[all_extrema_image, pruned_extrema_image, remaining_extrema] = local_maximas(pyramids{1});
+figure('Name','Finding the Local Maximas 1', 'FileName','LocalMaximas1.jpg');
+imshowpair(all_extrema_image,pruned_extrema_image,'montage');
+[all_extrema_image2, pruned_extrema_image2, remaining_extrema2] = local_maximas(pyramids{2});
+figure('Name','Finding the Local Maximas 2', 'FileName','LocalMaximas2.jpg');
+imshowpair(all_extrema_image2,pruned_extrema_image2,'montage');
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% QUESTION 5 by Nick Pohwat %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% [left_images, right_images] = keypoint_matching(im, im2, remaining_extrema, remaining_extrema2);
+% figure('Name','Keypoint Description and Matching', 'FileName','KeypointMatching.jpg');
+% imshowpair(left_images,right_images,'montage');
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 6 by Andrew Grier %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -198,7 +215,7 @@ function pyramids = image_pyramids(varargin)
     filterSize = @(sigma) ceil(3*sigma)*2+1;
     m_scales = 5;
     n_octaves = 4;
-    
+
     pyramids = cell(length(varargin), 1);
     for i = 1:length(varargin)
         im = varargin{i};
@@ -233,3 +250,67 @@ function show_pyramids(varargin)
     end
 end
 
+% 4 (10 points) Finding the Local Maximas
+function [all_extrema_image, pruned_extrema_image, pruned_extrema_bits] = local_maximas(pyramid)
+    all_extrema_image = pyramid{1, 1};
+    pruned_extrema_image = pyramid{1, 1};
+    location_multiplier = @(octave) 2^(octave - 1);
+    all_extremas_bits = zeros(size(all_extrema_image));
+
+    for octave = 1:size(pyramid, 1)
+        for scale = 2:size(pyramid, 2) - 1
+            scale_above = pyramid{octave,scale-1};
+            scale_current = pyramid{octave,scale};
+            scale_below = pyramid{octave,scale+1};
+            for height = 2:size(scale_current,1)-1
+                for width = 2:size(scale_current,2)-1
+                    window = [scale_above(height-1:height+1, width-1:width+1);
+                              scale_current(height-1:height+1, width-1:width+1);
+                              scale_below(height-1:height+1, width-1:width+1)];
+
+                    max_val = max(window(:));
+                    min_val = min(window(:));
+
+                    if scale_current(height, width) == max_val || scale_current(height, width) == min_val
+                        scaled_height = height * location_multiplier(octave);
+                        scaled_width = width * location_multiplier(octave);
+                        all_extremas_bits(scaled_height, scaled_width) = 1;
+                    end
+                end
+            end
+        end
+    end
+    [extrema_height, extrema_width] = find(all_extremas_bits == 1);
+    all_extrema_image = insertShape(all_extrema_image, 'Circle', [extrema_width, extrema_height, ones(length(extrema_width), 1)*5], 'Color', 'red');
+
+    pruned_extrema_bits = all_extremas_bits;
+
+    [extrema_height, extrema_width] = find(pruned_extrema_bits == 1);
+    edges = edge(pruned_extrema_image, 'Canny');
+    for i = 1:length(extrema_height)
+        if edges(extrema_height(i), extrema_width(i))
+            pruned_extrema_bits(extrema_height(i), extrema_width(i)) = 0;
+        end
+    end
+    
+    border_distance = 9;
+    pruned_extrema_bits(1:border_distance, :) = 0;
+    pruned_extrema_bits(end-border_distance+1:end, :) = 0;
+    pruned_extrema_bits(:, 1:border_distance) = 0;
+    pruned_extrema_bits(:, end-border_distance+1:end) = 0;
+
+    std_dev_threshold = 0.7;
+    patch_size = 9;
+    patch_radius = floor(patch_size / 2);
+    [extrema_height, extrema_width] = find(pruned_extrema_bits == 1);
+    for i = 1:length(extrema_height)
+        patch = pruned_extrema_image(extrema_height(i) - patch_radius:extrema_height(i) + patch_radius,extrema_width(i) - patch_radius:extrema_width(i) + patch_radius);
+        patch = double(patch(:));
+        if std(patch(:)) < std_dev_threshold
+            pruned_extrema_bits(extrema_height(i), extrema_width(i)) = 0;
+        end
+    end
+    
+    [extrema_height, extrema_width] = find(pruned_extrema_bits == 1);
+    pruned_extrema_image = insertShape(pruned_extrema_image, 'Circle', [extrema_width, extrema_height, ones(length(extrema_width), 1)*5], 'Color', 'red');
+end
