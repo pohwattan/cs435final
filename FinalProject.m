@@ -195,7 +195,7 @@ end
 
 % 3 (10 points) Create Scale-Space Image Pyramids
 function pyramids = image_pyramids(varargin)
-    kernel = @(sigma) ceil(3*sigma)*2+1;
+    filterSize = @(sigma) ceil(3*sigma)*2+1;
     m_scales = 5;
     n_octaves = 4;
     
@@ -208,9 +208,10 @@ function pyramids = image_pyramids(varargin)
 
         pyramid = cell(n_octaves, m_scales);
         for n = 1:n_octaves
+            k = sqrt(2);
             for m = 1:m_scales
-                sigma = 2^(n-1) * sqrt(2)^(m-1) * 1.6;
-                pyramid{n, m} = imgaussfilt(im, sigma, 'FilterSize', kernel(sigma));
+                sigma = 2^(n-1) * k^(m-1) * 1.6;
+                pyramid{n, m} = imgaussfilt(im, sigma, 'FilterSize', filterSize(sigma));
             end
             im = im(1:2:end, 1:2:end);
         end
