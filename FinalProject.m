@@ -23,43 +23,28 @@ stitchedImage = StitchImages(im, im2, transformationMatrix);
 figure('Name','Stitched Image', 'FileName','StitchedImage.jpg');
 imshow(stitchedImage);
 
-<<<<<<< HEAD
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% QUESTION 3 by Nick Pohwat %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-=======
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 3 by Nick Pohwat and Andrew Grier %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
->>>>>>> 90729ca (start part 5)
 [pyramids, DoGs] = image_pyramids(im, im2);
 for i = 1:length(pyramids)
     figure('Name', ['Scale-Space Image Pyramid ' num2str(i)], 'FileName', ['ImagePyramid' num2str(i) '.jpg']);
     show_pyramids(pyramids{i});
-    figure('Name', ['DoG Pyramid ' num2str(i)], 'FileName', ['DoGPyramid' num2str(i) '.jpg']);
-    show_pyramids(DoGs{i});
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 4 by Nick Pohwat and Andrew Grier %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-<<<<<<< HEAD
 [all_extrema_image, pruned_extrema_image, remaining_extrema] = local_maximas(DoGs{1}, pyramids{1}{1, 1});
 figure('Name','Finding the Local Maximas 1', 'FileName','LocalMaximas1.jpg');
 imshowpair(all_extrema_image,pruned_extrema_image,'montage');
 [all_extrema_image2, pruned_extrema_image2, remaining_extrema2] = local_maximas(DoGs{2}, pyramids{2}{1, 1});
-=======
-[all_extrema_image, pruned_extrema_image, remaining_extrema] = local_maximas(DoGs{1});
-figure('Name','Finding the Local Maximas 1', 'FileName','LocalMaximas1.jpg');
-imshowpair(all_extrema_image,pruned_extrema_image,'montage');
-[all_extrema_image2, pruned_extrema_image2, remaining_extrema2] = local_maximas(DoGs{2});
->>>>>>> 90729ca (start part 5)
 figure('Name','Finding the Local Maximas 2', 'FileName','LocalMaximas2.jpg');
 imshowpair(all_extrema_image2,pruned_extrema_image2,'montage');
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% QUESTION 5 by Nick Pohwat and Andrew Grier %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% QUESTION 5 by Nick Pohwat %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 [left_images, right_images] = keypoint_matching(im, im2, remaining_extrema, remaining_extrema2);
 figure('Name','Keypoint Description and Matching', 'FileName','KeypointMatching.jpg');
 imshowpair(left_images,right_images,'montage');
@@ -215,7 +200,7 @@ function stitchedImage = StitchImages(baseImage, transformedImage, transformatio
             end
         end
     end
-end
+end 
 
 function existsInImage = PointInImage (point, image)
     existsInImage = (point(1) > 0) && (point(1) <= size(image,2)) && (point(2) > 0) && (point(2) <= size(image,1));
@@ -381,34 +366,18 @@ function [all_extrema_image, pruned_extrema_image, pruned_extrema_bits] = local_
     end
     
     border_distance = 9;
-    [extrema_height, extrema_width] = find(pruned_extrema_bits == 1);
-    for i = 1:length(extrema_height)
-        if extrema_height(i) <= border_distance ||...
-            extrema_width(i) <= border_distance ||...
-            extrema_height(i) > size(pruned_extrema_image, 1) - border_distance ||...
-            extrema_width(i) > size(pruned_extrema_image, 2) - border_distance
-            pruned_extrema_bits(extrema_height(i), extrema_width(i)) = 0;
-        end
-    end
-    % pruned_extrema_bits(1:border_distance, :) = 0;
-    % pruned_extrema_bits(end-border_distance+1:end, :) = 0;
-    % pruned_extrema_bits(:, 1:border_distance) = 0;
-    % pruned_extrema_bits(:, end-border_distance+1:end) = 0;
+    pruned_extrema_bits(1:border_distance, :) = 0;
+    pruned_extrema_bits(end-border_distance+1:end, :) = 0;
+    pruned_extrema_bits(:, 1:border_distance) = 0;
+    pruned_extrema_bits(:, end-border_distance+1:end) = 0;
 
     std_dev_threshold = 0.03;
     patch_size = 9;
     patch_radius = floor(patch_size / 2);
-<<<<<<< HEAD
 
     [pruned_extrema_height, pruned_extrema_width] = find(pruned_extrema_bits == 1);
     for i = 1:length(pruned_extrema_height)
         patch = pruned_extrema_image(pruned_extrema_height(i) - patch_radius:pruned_extrema_height(i) + patch_radius,pruned_extrema_width(i) - patch_radius:pruned_extrema_width(i) + patch_radius);
-=======
-    [extrema_height, extrema_width] = find(pruned_extrema_bits == 1);
-    for i = 1:length(extrema_height)
-        patch = pruned_extrema_image(extrema_height(i) - patch_radius:extrema_height(i) + patch_radius,...
-                                     extrema_width(i) - patch_radius:extrema_width(i) + patch_radius);
->>>>>>> 90729ca (start part 5)
         patch = double(patch(:));
         if std(patch(:)) < std_dev_threshold
             pruned_extrema_bits(pruned_extrema_height(i), pruned_extrema_width(i)) = 0;
@@ -421,18 +390,52 @@ end
 
 % 5 (10 points) Keypoint Description and Matching
 function [left, right] = keypoint_matching(im, im2, remaining_extrema1, remaining_extrema2)
-    descriptors1 = extract_descriptors(im, remaining_extrema1);
-    descriptors2 = extract_descriptors(im2, remaining_extrema2);
-    left = 0; % Placeholder
-    right = 0; % Placeholder
+    [keypoints1, descriptors1] = extract_descriptors(im, remaining_extrema1);
+    [keypoints2, descriptors2] = extract_descriptors(im2, remaining_extrema2);
+
+    C_1 = match(descriptors1, descriptors2, keypoints1, keypoints2);
+    C_2 = match(descriptors2, descriptors1, keypoints2, keypoints1);
+    C = intersect(C_1, C_2, 'rows');
+
+    threshold = 0.5;
+    keypoint1 = C(:,1:2);
+    keypoint2 = C(:,3:4);
+    distances = sqrt((keypoint1 - keypoint2) * (keypoint1 - keypoint2).');
+    C = C(distances < threshold, :);
+
+    left = draw_matches(im, keypoint1, 'right');
+    right = draw_matches(im2, keypoint2, 'left');
 end
 
-function descriptors = extract_descriptors(im, remaining_extrema)
-    [keypoint_height, keypoint_width] = find(remaining_extrema == 1);
-    num_keypoints = length(keypoint_rows);
-    descriptors = zeros(num_keypoints, 243);
-    for i = 1:num_keypoints
-        patch = im(keypoint_rows(i)-4:keypoint_rows(i)+4, keypoint_cols(i)-4:keypoint_cols(i)+4, :);
-        descriptors(i,:) = reshape(patch, [1, 243]);
+function [keypoints, descriptors] = extract_descriptors(im, remaining_extrema)
+    [extrema_height, extrema_width] = find(remaining_extrema == 1);
+    keypoints = [extrema_height, extrema_width];
+    extrema_length = length(extrema_height);
+    descriptors = zeros(extrema_length, 243);
+    for i = 1:extrema_length
+        patch = im(extrema_height(i)-4:extrema_height(i)+4, extrema_width(i)-4:extrema_width(i)+4, :);
+        flatten = reshape(patch, [1, 243]);
+        descriptors(i,:) = flatten;
+    end
+end
+
+function matches = match(descriptors1, descriptors2, keypoints1, keypoints2)
+    descriptors_height = size(descriptors1, 1);
+    matches = zeros(descriptors_height, 4);
+
+    for i = 1:descriptors_height
+        %%%
+    end
+end
+
+function im = draw_matches(im, keypoints, direction)
+    for i = 1:size(keypoints, 1)
+        start_point = keypoints(i, :);
+        if strcmp(direction, 'right')
+            end_point = [size(im, 2), keypoints(i, 2)];
+        elseif strcmp(direction, 'left')
+            end_point = [1, keypoints(i, 2)];
+        end
+        im = insertShape(im, 'Line', [start_point, end_point], 'Color', 'red', 'LineWidth', 2);
     end
 end
