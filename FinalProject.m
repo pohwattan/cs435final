@@ -42,13 +42,12 @@ imshowpair(all_extrema_image,pruned_extrema_image,'montage');
 figure('Name','Finding the Local Maximas 2', 'FileName','LocalMaximas2.jpg');
 imshowpair(all_extrema_image2,pruned_extrema_image2,'montage');
 
-<<<<<<< HEAD
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 5 by Nick Pohwat and Andrew Grier %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[left_images, right_images] = keypoint_matching(im, im2, remaining_extrema, remaining_extrema2);
+canvas = keypoint_matching(im, im2, remaining_extrema, remaining_extrema2);
 figure('Name','Keypoint Description and Matching', 'FileName','KeypointMatching.jpg');
-imshowpair(left_image,right_image,'montage');
+imshow(canvas);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 6 by Nick Pohwat %
@@ -423,7 +422,7 @@ function [all_extrema_image, pruned_extrema_image, pruned_extrema_bits] = local_
 
     std_dev_threshold = 0.03;
     patch_size = 9;
-    patch_radius = floor(patch_size / 2);
+    patch_radius = floor(patch_size/2);
 
     [pruned_extrema_height, pruned_extrema_width] = find(pruned_extrema_bits == 1);
     for i = 1:length(pruned_extrema_height)
@@ -462,7 +461,7 @@ function unionedSet = CreateUnionOfDescriptorSets(descriptorSet1, descriptorSet2
 end
 
 % 5 (10 points) Keypoint Description and Matching
-function [left, right] = keypoint_matching(im, im2, remaining_extrema1, remaining_extrema2)
+function canvas = keypoint_matching(im, im2, remaining_extrema1, remaining_extrema2)
     %IMPORTANT: The indices for descriptors are the same as for their
     %keypoints locations. So we can use these later when drawing lines
     [keypoints1, descriptors1] = extract_descriptors(im, remaining_extrema1);
@@ -475,12 +474,11 @@ function [left, right] = keypoint_matching(im, im2, remaining_extrema1, remainin
     %Indices from keypoints2 are in the middle
     %Distances are on the right
     %   Feel free to change the third input to a threshold of your choice!
-    C_union = CreateUnionOfDescriptorSets(C_1, C_2, 500);
+    C_union = CreateUnionOfDescriptorSets(C_1, C_2, 300);
     
     %Remember to look up how drawing the lines will change based on the
     %wider canvas with both images...
-    %left = draw_matches(im, keypoint1, 'right');
-    %right = draw_matches(im2, keypoint2, 'left');
+    canvas = draw_matches(im, im2, keypoints1, keypoints2, C_union);
 end
 
 function [keypoints, descriptors] = extract_descriptors(im, remaining_extrema)
@@ -513,7 +511,6 @@ function matches = match(descriptors1, descriptors2)
     matches = zeros(descriptors_height, 3);
     
     for i = 1:descriptors_height
-<<<<<<< HEAD
         keypointDescriptorSource = descriptors1(i,:);
         % If anything still has an index of -1 by the end, something went
         % wrong!
@@ -530,20 +527,25 @@ function matches = match(descriptors1, descriptors2)
         matches(i,1) = i;
         matches(i,2) = currentBestMatchIndex;
         matches(i,3) = currentBestMatchDistance;
-=======
-        
->>>>>>> bdd2284 (stashing)
     end
 end
 
-function im = draw_matches(im, keypoints, direction)
-    for i = 1:size(keypoints, 1)
-        start_point = keypoints(i, :);
-        if strcmp(direction, 'right')
-            end_point = [size(im, 2), keypoints(i, 2)];
-        elseif strcmp(direction, 'left')
-            end_point = [1, keypoints(i, 2)];
-        end
-        im = insertShape(im, 'Line', [start_point, end_point], 'Color', 'red', 'LineWidth', 2);
+function canvas = draw_matches(im, im2, keypoints1, keypoints2, C_union)
+    canvas_height = max(size(im, 1), size(im2, 1));
+    canvas_width = size(im, 2) + size(im2, 2);
+    canvas = zeros(canvas_height, canvas_width, size(im, 3), 'like', im);
+    canvas(1:size(im, 1), 1:size(im, 2), :) = im;
+    canvas(1:size(im2, 1), size(im, 2)+1:end, :) = im2;
+
+    keypoints2(:,2) = keypoints2(:,2) + size(im, 2);
+    for i = 1:size(C_union, 1)
+        start_point = keypoints1(C_union(i, 1), :);
+        end_point = keypoints2(C_union(i, 2), :);
+        canvas = insertShape(canvas, 'Line', [[start_point(2), start_point(1)], [end_point(2), end_point(1)]], 'Color', 'red', 'LineWidth', 2);
     end
+end
+
+% 6 (10 points) Find the Transformation Matrix via RANSAC and Stitch
+function auto_stitch()
+    %
 end
