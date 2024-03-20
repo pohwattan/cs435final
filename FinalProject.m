@@ -42,12 +42,13 @@ imshowpair(all_extrema_image,pruned_extrema_image,'montage');
 figure('Name','Finding the Local Maximas 2', 'FileName','LocalMaximas2.jpg');
 imshowpair(all_extrema_image2,pruned_extrema_image2,'montage');
 
+<<<<<<< HEAD
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 5 by Nick Pohwat and Andrew Grier %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 [left_images, right_images] = keypoint_matching(im, im2, remaining_extrema, remaining_extrema2);
 figure('Name','Keypoint Description and Matching', 'FileName','KeypointMatching.jpg');
-imshowpair(left_images,right_images,'montage');
+imshowpair(left_image,right_image,'montage');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 6 by Nick Pohwat %
@@ -512,6 +513,7 @@ function matches = match(descriptors1, descriptors2)
     matches = zeros(descriptors_height, 3);
     
     for i = 1:descriptors_height
+<<<<<<< HEAD
         keypointDescriptorSource = descriptors1(i,:);
         % If anything still has an index of -1 by the end, something went
         % wrong!
@@ -528,6 +530,9 @@ function matches = match(descriptors1, descriptors2)
         matches(i,1) = i;
         matches(i,2) = currentBestMatchIndex;
         matches(i,3) = currentBestMatchDistance;
+=======
+        
+>>>>>>> bdd2284 (stashing)
     end
 end
 
