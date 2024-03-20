@@ -42,15 +42,15 @@ imshowpair(all_extrema_image,pruned_extrema_image,'montage');
 figure('Name','Finding the Local Maximas 2', 'FileName','LocalMaximas2.jpg');
 imshowpair(all_extrema_image2,pruned_extrema_image2,'montage');
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% QUESTION 5 by Nick Pohwat %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% QUESTION 5 by Nick Pohwat and Andrew Grier %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 [left_images, right_images] = keypoint_matching(im, im2, remaining_extrema, remaining_extrema2);
 figure('Name','Keypoint Description and Matching', 'FileName','KeypointMatching.jpg');
 imshowpair(left_images,right_images,'montage');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% QUESTION 6 by Andrew Grier %
+% QUESTION 6 by Nick Pohwat %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -66,10 +66,19 @@ function [im, im2, points, points2] = point_correspondences(im, im2)
     end
 end
 
-% Get the transformation matrix using points
+%Author: Andrew Grier
+%   - Finds the transformation matrix given a set of keypoints and
+%     transformed points in the format:
+%       [ x1 , y1 ]
+%       [ x2 , y2 ]
+%           ...
+%       [ xn , yn ]
+%     Outputs a transformation matrix specified in the format:
+%       [ a , b , c ]
+%       [ d , e , f ]
+%       [ g , h , i ]
 function homogenousMatrix = FindTransformationMatrixWithPoints(basePoints, primePoints)
     %Note: Points are still in (x,y) notation
-    
     homogenousMatrix = zeros(3,3);
     A = [];
     B = [];
@@ -100,11 +109,26 @@ function homogenousMatrix = FindTransformationMatrixWithPoints(basePoints, prime
     testPointPrime = primePoints(testPointNum, :);
     transformTestPoint = TransformPoint(testPoint, homogenousMatrix);
     isTransformationCorrect = isequal(testPointPrime, transformTestPoint);
-    if (~isTransformationCorrect) 
+    if (~isTransformationCorrect)
         disp("Something went wrong finding the transformation matrix!");
     end
 end
 
+%Author: Andrew Grier
+%   - Transforms multiple points coming in in the format:
+%       [ x1 , y1 ]
+%       [ x2 , y2 ]
+%           ...
+%       [ xn , yn ]
+%     Using a transformation matrix specified in the format:
+%       [ a , b , c ]
+%       [ d , e , f ]
+%       [ g , h , i ]
+%     Outputs multiple points in the format:
+%       [ x1' , y1' ]
+%       [ x2' , y2' ]
+%           ...
+%       [ xn' , yn' ]
 function transformedPoints = TransformMultiplePoints(points, transformationMatrix)
     transformedPoints = zeros(size(points, 1), size(points, 2));
     for pointNum = 1:size(points,1)
@@ -112,17 +136,32 @@ function transformedPoints = TransformMultiplePoints(points, transformationMatri
     end
 end
 
+%Author: Andrew Grier
+%   - Transforms a point coming in in the format:
+%       [ x , y ]
+%     Using a transformation matrix specified in the format:
+%       [ a , b , c ]
+%       [ d , e , f ]
+%       [ g , h , i ]
+%     Outputs a point in the format:
+%       [ x , y ]
 function transformedPoint = TransformPoint(point, transformationMatrix)
-    %Assuming points are coming in as (x,y)
+    %Assuming points are coming in as (x,y), homogenize the point.
     homogenousPoint = [
             point(1);
             point(2);
             1
         ];
     homogenousTransformedPoint = transformationMatrix * homogenousPoint;
+    %Rounding here ensures the x and y are still in pixel amounts.
     transformedPoint = [round(homogenousTransformedPoint(1,:)/homogenousTransformedPoint(3,:)), round(homogenousTransformedPoint(2,:)/homogenousTransformedPoint(3,:))];
 end
 
+%Author: Andrew Grier
+%   - Stitches two images together given a transformation matrix. This
+%     function assumes that the transformed image is the one on the right
+%     hand side. IMPORTANT!! THIS FUNCTION EXPECTS IMAGES IN THE UINT8
+%     FORMAT FOR THEIR COLORS!!
 function stitchedImage = StitchImages(baseImage, transformedImage, transformationMatrix)
     %Points are still in (x,y) format
     transformedImageCornerPoints = [
@@ -131,19 +170,25 @@ function stitchedImage = StitchImages(baseImage, transformedImage, transformatio
         size(transformedImage, 2) 1;                        %Top Right
         size(transformedImage, 2) size(transformedImage, 1) %Bottom Right
     ];
+
+    %This part gets min and max values for x and y of the transformed image 
+    %in the base image coordinate space to help determine what the size of 
+    %the stitched image needs to be
     transformedImageTransformedCornerPoints = TransformMultiplePoints(transformedImageCornerPoints, inv(transformationMatrix));
     minTransformedY = min(transformedImageTransformedCornerPoints(1,2), transformedImageTransformedCornerPoints(3,2));
     maxTransformedY = max(transformedImageTransformedCornerPoints(2,2), transformedImageTransformedCornerPoints(4,2));
     minTransformedX = min(transformedImageTransformedCornerPoints(1,1), transformedImageTransformedCornerPoints(2,1));
     maxTransformedX = max(transformedImageTransformedCornerPoints(3,1), transformedImageTransformedCornerPoints(4,1));
-    % transformedImageTransformedHeight = maxTransformedY - minTransformedY;
-    % transformedImageTransformedWidth = maxTransformedX - minTransformedX;
     
+    %This part gets min and max values for x and y of the base image 
+    %to help determine what the size of the stitched image needs to be
     minBaseImageY = 0;
     maxBaseImageY = size(baseImage, 1);
     minBaseImageX = 0;
     maxBaseImageX = size(baseImage, 2);
-    % baseImageHeight = size(baseImage, 1);
+
+    %This is used later for determining alpha to make edges in the images
+    %appear less noticeable
     baseImageWidth = size(baseImage, 2);
     
     %Setup canvas for the stitched image
@@ -153,29 +198,41 @@ function stitchedImage = StitchImages(baseImage, transformedImage, transformatio
     maxStitchedImageX = max(maxBaseImageX, maxTransformedX);
     stitchedImageHeight = maxStitchedImageY - minStitchedImageY;
     stitchedImageWidth = maxStitchedImageX - minStitchedImageX;
+
+    %The output image will also be in uint8
     stitchedImage = uint8(zeros(stitchedImageHeight, stitchedImageWidth, 3));
 
     for y = 1:stitchedImageHeight
+        %Simple Progress bar
         clc;
         disp("Stitching Progress = " + round((y/stitchedImageHeight)*100) + "%");
         for x = 1:stitchedImageWidth
+            %If the transformed image made the canvas larger to the left of
+            %the base image, we need to account for this when getting the
+            %point from base image
             if (minTransformedX < 1)
                 baseImageX = x + minTransformedX;
             else
                 baseImageX = x;
             end
-
+            
+            %If the transformed image made the canvas taller than the top of
+            %the base image, we need to account for this when getting the
+            %point from base image
             if (minTransformedY < 1)
                 baseImageY = y + minTransformedY;
             else
                 baseImageY = y;
             end
-
+            
+            %Setup the two points to be in the same image space
             baseImagePoint = [baseImageX, baseImageY];
             transformedImagePoint = TransformPoint(baseImagePoint, transformationMatrix);
             transformedImageY = transformedImagePoint(2);
             transformedImageX = transformedImagePoint(1);
             
+            %Check if the point we are looking for exists in both images,
+            %if it doesn't we will need to set its color to black.
             pointExistsInBaseImage = PointInImage(baseImagePoint, baseImage);
             pointExistsInTransformedImage = PointInImage(transformedImagePoint, transformedImage);
 
@@ -190,22 +247,33 @@ function stitchedImage = StitchImages(baseImage, transformedImage, transformatio
             else
                 transformedImagePointColor = [transformedImage(transformedImageY, transformedImageX, 1) transformedImage(transformedImageY, transformedImageX, 2) transformedImage(transformedImageY, transformedImageX, 3)];
             end
-            
+            %If the point exists in an overlap between the two images, we
+            %need to blend their colors together, otherwise just use one
+            %point or the other.
             if (pointExistsInBaseImage && pointExistsInTransformedImage)
                 stitchedImage(y,x,:) = uint8(BlendPointColors(baseImagePointColor, transformedImagePointColor, (1 - baseImageX/baseImageWidth)));
             elseif (pointExistsInTransformedImage)
                 stitchedImage(y,x,:) = uint8(transformedImagePointColor);
             else
+                %Defaulting to baseImagePointColor also accounts for any
+                %out of bounds points that are set to black above
                 stitchedImage(y,x,:) = uint8(baseImagePointColor);
             end
         end
     end
 end 
 
+%Author: Andrew Grier
+%   - Simple function that returns true if the point exists within the
+%     bounds of the image. Needs both the point to be in the format:
+%       [ x , y ]
 function existsInImage = PointInImage (point, image)
     existsInImage = (point(1) > 0) && (point(1) <= size(image,2)) && (point(2) > 0) && (point(2) <= size(image,1));
 end
 
+%Author: Andrew Grier
+%   - Given point colors in uint8, it will use the given alpha (between 0
+%     and 1) to blend alpha% of the first color and 1-alpha% of the second
 function blendedPointColors = BlendPointColors (point1Colors, point2Colors, alpha)
     blendedPointColors = [point1Colors(1)*alpha+point2Colors(1)*(1-alpha) point1Colors(2)*alpha+point2Colors(2)*(1-alpha) point1Colors(3)*alpha+point2Colors(3)*(1-alpha)];
 end
@@ -255,33 +323,12 @@ function show_pyramids(varargin)
     end
 end
 
-function [extremaValue, extremaLocation] = FindMatrixExtrema(inputMatrix, mode)
-    matrixHeight = size(inputMatrix, 1);
-    matrixWidth = size(inputMatrix, 2);
-    matrixDepth = size(inputMatrix, 3);
-    extremaValue = inputMatrix(2,2,2);
-    extremaLocation = [2,2,2];
-    for y = 1:matrixHeight
-        for x = 1:matrixWidth
-            for z = 1:matrixDepth
-                if (mode == "max")
-                    if inputMatrix(x,y,z) > extremaValue
-                        extremaValue = inputMatrix(x,y,z);
-                        extremaLocation = [x,y,z];
-                    end
-                elseif (mode == "min")
-                    if inputMatrix(x,y,z) < extremaValue
-                        extremaValue = inputMatrix(x,y,z);
-                        extremaLocation = [x,y,z];
-                    end
-                else
-                    disp("Something went wrong with MinMaxExtrema, could not recognize mode!");
-                end
-            end
-        end
-    end
-end
-
+%Author: Andrew Grier
+%   - Based on the given mode, find out if the point is the largest or
+%     smallest out of all of its peers in a 3 by 3 by 3 area. The var mode
+%     can be either "min" or "max" to determine if the point is a local
+%     minimum or maximum respectively
+%     Returns a boolean (0 or 1)
 function isCurrentPointExtrema = IsCurrentPointExtrema(inputMatrix, mode)
     matrixHeight = size(inputMatrix, 1);
     matrixWidth = size(inputMatrix, 2);
@@ -291,6 +338,8 @@ function isCurrentPointExtrema = IsCurrentPointExtrema(inputMatrix, mode)
     for y = 1:matrixHeight
         for x = 1:matrixWidth
             for z = 1:matrixDepth
+                % Skip the center point, since that is what we are 
+                % comparing everything else to
                 if (x == 2 && y == 2 && z == 2)
                     continue
                 end
@@ -388,23 +437,49 @@ function [all_extrema_image, pruned_extrema_image, pruned_extrema_bits] = local_
     pruned_extrema_image = insertShape(baseImage, 'Circle', [pruned_extrema_width, pruned_extrema_height, ones(length(pruned_extrema_width), 1)*5], 'Color', 'red');
 end
 
+%Author: Andrew Grier
+%   - Returns a specialized set, unionSet to be used with
+%     keypoint_matching, this should be the union of the two input sets, 
+%     minus any matches with distances that go above the threshold
+function unionedSet = CreateUnionOfDescriptorSets(descriptorSet1, descriptorSet2, maxDistance)
+    unionedSet = [];
+    unionedSetIndex = 1;
+    %Get the union of the two sets
+    for i = 1:size(descriptorSet1, 1)
+        for j = 1:size(descriptorSet2, 1)
+            if i == descriptorSet2(j,2)
+                %Prune descriptors with distances that are too far
+                if (descriptorSet1(i,3) > maxDistance)
+                    break;
+                end
+                unionedSet(unionedSetIndex, :) = descriptorSet1(i, :);
+                unionedSetIndex = unionedSetIndex + 1;
+                break;
+            end
+        end
+    end
+end
+
 % 5 (10 points) Keypoint Description and Matching
 function [left, right] = keypoint_matching(im, im2, remaining_extrema1, remaining_extrema2)
+    %IMPORTANT: The indices for descriptors are the same as for their
+    %keypoints locations. So we can use these later when drawing lines
     [keypoints1, descriptors1] = extract_descriptors(im, remaining_extrema1);
     [keypoints2, descriptors2] = extract_descriptors(im2, remaining_extrema2);
 
-    C_1 = match(descriptors1, descriptors2, keypoints1, keypoints2);
-    C_2 = match(descriptors2, descriptors1, keypoints2, keypoints1);
-    C = intersect(C_1, C_2, 'rows');
+    C_1 = match(descriptors1, descriptors2);
+    C_2 = match(descriptors2, descriptors1);
 
-    threshold = 0.5;
-    keypoint1 = C(:,1:2);
-    keypoint2 = C(:,3:4);
-    distances = sqrt((keypoint1 - keypoint2) * (keypoint1 - keypoint2).');
-    C = C(distances < threshold, :);
-
-    left = draw_matches(im, keypoint1, 'right');
-    right = draw_matches(im2, keypoint2, 'left');
+    %Indices from keypoints1 are on the left
+    %Indices from keypoints2 are in the middle
+    %Distances are on the right
+    %   Feel free to change the third input to a threshold of your choice!
+    C_union = CreateUnionOfDescriptorSets(C_1, C_2, 500);
+    
+    %Remember to look up how drawing the lines will change based on the
+    %wider canvas with both images...
+    %left = draw_matches(im, keypoint1, 'right');
+    %right = draw_matches(im2, keypoint2, 'left');
 end
 
 function [keypoints, descriptors] = extract_descriptors(im, remaining_extrema)
@@ -419,12 +494,40 @@ function [keypoints, descriptors] = extract_descriptors(im, remaining_extrema)
     end
 end
 
-function matches = match(descriptors1, descriptors2, keypoints1, keypoints2)
+%Author: Andrew Grier
+%   - Takes in the two sets of descriptors and matches the closest ones
+%     using the indices of the two lists.
+%     Returns in the format:
+%       [ descriptor1Index1 , descriptor2IndexOfBestMatch1 , distanceForThisMatch1 ]
+%       [ descriptor1Index2 , descriptor2IndexOfBestMatch2 , distanceForThisMatch2 ]
+%                                           ...
+%       [ descriptor1IndexN , descriptor2IndexOfBestMatchN , distanceForThisMatchN ]
+function matches = match(descriptors1, descriptors2)
     descriptors_height = size(descriptors1, 1);
-    matches = zeros(descriptors_height, 4);
+    descriptors2_height = size(descriptors2, 1);
+    % The index of the source point is on the left, the index of the
+    % matched point is in the middle,
+    % distance is on the right.
 
+    matches = zeros(descriptors_height, 3);
+    
     for i = 1:descriptors_height
-        %%%
+        keypointDescriptorSource = descriptors1(i,:);
+        % If anything still has an index of -1 by the end, something went
+        % wrong!
+        currentBestMatchIndex = -1;
+        currentBestMatchDistance = 999999;
+        for j = 1:descriptors2_height
+            keypointDescriptorComparison = descriptors2(j,:);
+            distance = sqrt((keypointDescriptorSource - keypointDescriptorComparison) * (keypointDescriptorSource - keypointDescriptorComparison).');
+            if (distance <= currentBestMatchDistance)
+                currentBestMatchIndex = j;
+                currentBestMatchDistance = distance;
+            end
+        end
+        matches(i,1) = i;
+        matches(i,2) = currentBestMatchIndex;
+        matches(i,3) = currentBestMatchDistance;
     end
 end
 
