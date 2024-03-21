@@ -591,8 +591,12 @@ function [canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1,
     best_transformation_matrix = [];
     threshold_distance = 20;
     best_close_distances = 0;
+    im_size = size(im);
+    im_size2 = size(im2);
+    best_random_extrema1 = zeros(size(im_size));
+    best_random_extrema2 = zeros(size(im_size2));
 
-    experiments = 1000;
+    experiments = 100;
     number_of_correspondences = 4;
     for i = 1:experiments
         random_indices = randperm(size(C_union, 1), number_of_correspondences);
@@ -608,7 +612,7 @@ function [canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1,
         random_extrema1 = zeros(size(im));
         random_extrema2 = zeros(size(im2));
 
-        current_transformation_matrix = FindTransformationMatrixWithPoints(random_keypoints1, random_keypoints2);
+        current_transformation_matrix = FindTransformationMatrixWithPoints(flip(random_keypoints1,1), flip(random_keypoints2,1));
 
         current_close_distances = 0;
         for j = 1:size(C_union,1)
@@ -627,7 +631,9 @@ function [canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1,
                 random_extrema1(random_keypoints1(j,1), random_keypoints1(j,2)) = 1;
                 random_extrema2(random_keypoints2(j,1), random_keypoints2(j,2)) = 1;
             end
+            best_random_extrema1 = random_extrema1;
+            best_random_extrema2 = random_extrema2;
         end
     end
-    canvas = keypoint_matching(im, im2, random_extrema1, random_extrema2);
+    canvas = keypoint_matching(im, im2, best_random_extrema1, best_random_extrema2);
 end
