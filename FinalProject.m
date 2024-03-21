@@ -11,7 +11,9 @@ im2 = imrotate(im2, -90);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 1 by Nick Pohwat and Andrew Grier %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[imMarked, im2Marked, points, points2] = point_correspondences(im, im2);
+points = [545 238; 299 510; 665 896; 281 896];
+points2 = [383 258; 115 506; 443 896; 65 918];
+[imMarked, im2Marked, points, points2] = point_correspondences(im, im2, points, points2);
 figure('Name','Point Correspondence Side-by-Side', 'FileName','PointCorrespondence.jpg');
 imshowpair(imMarked,im2Marked,'montage');
 
@@ -45,19 +47,23 @@ imshowpair(all_extrema_image2,pruned_extrema_image2,'montage');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 5 by Nick Pohwat and Andrew Grier %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-canvas = keypoint_matching(im, im2, remaining_extrema, remaining_extrema2);
+[canvas, keypoints1, keypoints2, C_union] = keypoint_matching(im, im2, remaining_extrema, remaining_extrema2);
 figure('Name','Keypoint Description and Matching', 'FileName','KeypointMatching.jpg');
 imshow(canvas);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 6 by Nick Pohwat %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+[best_canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1, keypoints2, C_union);
+figure('Name','Best Keypoint Description and Matching', 'FileName','BestKeypointMatching.jpg');
+imshow(best_canvas);
+bestStitchedImage = StitchImages(im, im2, best_transformation_matrix);
+figure('Name','Best Stitched Image', 'FileName','BestStitchedImage.jpg');
+imshow(bestStitchedImage);
 
 
 % 1 (10 points) Hard Coding Point Correspondences
-function [im, im2, points, points2] = point_correspondences(im, im2)
-    points = [545 238; 299 510; 665 896; 281 896];
-    points2 = [383 258; 115 506; 443 896; 65 918];
+function [im, im2, points, points2] = point_correspondences(im, im2, points, points2)
     radius = 8;
     colors = {'red', 'yellow', 'blue', 'green'};
     for i = 1:size(points,1)
@@ -461,7 +467,7 @@ function unionedSet = CreateUnionOfDescriptorSets(descriptorSet1, descriptorSet2
 end
 
 % 5 (10 points) Keypoint Description and Matching
-function canvas = keypoint_matching(im, im2, remaining_extrema1, remaining_extrema2)
+function [canvas, keypoints1, keypoints2, C_union] = keypoint_matching(im, im2, remaining_extrema1, remaining_extrema2)
     %IMPORTANT: The indices for descriptors are the same as for their
     %keypoints locations. So we can use these later when drawing lines
     [keypoints1, descriptors1] = extract_descriptors(im, remaining_extrema1);
@@ -546,6 +552,40 @@ function canvas = draw_matches(im, im2, keypoints1, keypoints2, C_union)
 end
 
 % 6 (10 points) Find the Transformation Matrix via RANSAC and Stitch
-function auto_stitch()
-    %
+function [canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1, keypoints2, C_union)
+    best_transformation_matrix = [];
+    threshold_distance = 20;
+    best_close_distances = 0;
+
+    experiments = 100;
+    number_of_correspondences = 4;
+    for i = 1:experiments
+        random_indices = randperm(size(C_union, 1), number_of_correspondences);
+        random_keypoints1 = keypoints1(C_union(random_indices,1), :);
+        random_keypoints2 = keypoints2(C_union(random_indices,2), :);
+        random_extrema1 = zeros(size(im));
+        random_extrema2 = zeros(size(im2));
+
+        current_transformation_matrix = FindTransformationMatrixWithPoints(random_keypoints1, random_keypoints2);
+
+        current_close_distances = 0;
+        for j = 1:size(C_union,1)
+            current_keypoint1 = keypoints1(C_union(j,1),:);
+            current_keypoint2 = keypoints2(C_union(j,2),:);
+            transformed_point = TransformPoint(current_keypoint1, current_transformation_matrix);
+            distance = sqrt(((transformed_point(1) - current_keypoint2(1))^2) + ((transformed_point(2) - current_keypoint2(2))^2));
+            if distance <= threshold_distance
+                current_close_distances = current_close_distances + 1;
+            end
+        end
+
+        if isempty(best_transformation_matrix) || current_close_distances > best_close_distances
+            best_transformation_matrix = current_transformation_matrix;
+            for j = 1:number_of_correspondences
+                random_extrema1(random_keypoints1(j,1), random_keypoints1(j,2)) = 1;
+                random_extrema2(random_keypoints2(j,1), random_keypoints2(j,2)) = 1;
+            end
+        end
+    end
+    canvas = keypoint_matching(im, im2, random_extrema1, random_extrema2);
 end
