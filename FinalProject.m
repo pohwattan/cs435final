@@ -448,20 +448,55 @@ end
 %     keypoint_matching, this should be the union of the two input sets, 
 %     minus any matches with distances that go above the threshold
 function unionedSet = CreateUnionOfDescriptorSets(descriptorSet1, descriptorSet2, maxDistance)
-    unionedSet = [];
-    unionedSetIndex = 1;
+    unionedSetTemp = [];
+    unionedSetTempIndex = 1;
     %Get the union of the two sets
     for i = 1:size(descriptorSet1, 1)
+        currentBestPairing = [];
+        currentBestDistance = 5*maxDistance;
         for j = 1:size(descriptorSet2, 1)
             if i == descriptorSet2(j,2)
                 %Prune descriptors with distances that are too far
                 if (descriptorSet1(i,3) > maxDistance)
-                    break;
+                    continue;
                 end
-                unionedSet(unionedSetIndex, :) = descriptorSet1(i, :);
-                unionedSetIndex = unionedSetIndex + 1;
-                break;
+                if (descriptorSet1(i,3) < currentBestDistance)
+                    currentBestPairing = descriptorSet1(i, :);
+                    currentBestDistance = descriptorSet1(i,3);
+                end
             end
+        end
+        if (currentBestDistance <= maxDistance)
+            unionedSetTemp(unionedSetTempIndex, :) = currentBestPairing;
+            unionedSetTempIndex = unionedSetTempIndex + 1;
+        end
+    end
+    
+    unionedSet = [];
+    unionedSetIndex = 1;
+    %Remove duplicate entries from column 2
+    for k = 1:size(unionedSetTemp, 1)
+        currentPairedIndex = unionedSetTemp(k, 2);
+        currentPairedDistance = unionedSetTemp(k,3);
+        currentPairing = unionedSetTemp(k,:);
+        foundBetterDuplicate = false;
+        for m = 1:size(unionedSetTemp, 1)
+            if (m == k)
+                continue;
+            end
+            comparisonPairedIndex = unionedSetTemp(m,2);
+            if (comparisonPairedIndex == currentPairedIndex)
+                comparisonPairedDistance = unionedSetTemp(m,3);
+                    if (comparisonPairedDistance < currentPairedDistance)
+                        foundBetterDuplicate = true;
+                    end
+            end
+        end
+        if (foundBetterDuplicate)
+            continue;
+        else
+            unionedSet(unionedSetIndex, :) = currentPairing;
+            unionedSetIndex = unionedSetIndex + 1;
         end
     end
 end
@@ -556,17 +591,21 @@ function [canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1,
     best_transformation_matrix = [];
     threshold_distance = 20;
     best_close_distances = 0;
+    im_size = size(im);
+    im_size2 = size(im2);
+    best_random_extrema1 = zeros(size(im_size));
+    best_random_extrema2 = zeros(size(im_size2));
 
-    experiments = 1000;
+    experiments = 100;
     number_of_correspondences = 4;
     for i = 1:experiments
         random_indices = randperm(size(C_union, 1), number_of_correspondences);
         random_keypoints1 = keypoints1(C_union(random_indices,1), :);
         random_keypoints2 = keypoints2(C_union(random_indices,2), :);
-        random_extrema1 = zeros(size(im));
-        random_extrema2 = zeros(size(im2));
+        random_extrema1 = zeros(im_size);
+        random_extrema2 = zeros(im_size2);
 
-        current_transformation_matrix = FindTransformationMatrixWithPoints(random_keypoints1, random_keypoints2);
+        current_transformation_matrix = FindTransformationMatrixWithPoints(flip(random_keypoints1,1), flip(random_keypoints2,1));
 
         current_close_distances = 0;
         for j = 1:size(C_union,1)
@@ -585,7 +624,9 @@ function [canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1,
                 random_extrema1(random_keypoints1(j,1), random_keypoints1(j,2)) = 1;
                 random_extrema2(random_keypoints2(j,1), random_keypoints2(j,2)) = 1;
             end
+            best_random_extrema1 = random_extrema1;
+            best_random_extrema2 = random_extrema2;
         end
     end
-    canvas = keypoint_matching(im, im2, random_extrema1, random_extrema2);
+    canvas = keypoint_matching(im, im2, best_random_extrema1, best_random_extrema2);
 end
