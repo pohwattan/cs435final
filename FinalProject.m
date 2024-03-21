@@ -448,20 +448,55 @@ end
 %     keypoint_matching, this should be the union of the two input sets, 
 %     minus any matches with distances that go above the threshold
 function unionedSet = CreateUnionOfDescriptorSets(descriptorSet1, descriptorSet2, maxDistance)
-    unionedSet = [];
-    unionedSetIndex = 1;
+    unionedSetTemp = [];
+    unionedSetTempIndex = 1;
     %Get the union of the two sets
     for i = 1:size(descriptorSet1, 1)
+        currentBestPairing = [];
+        currentBestDistance = 5*maxDistance;
         for j = 1:size(descriptorSet2, 1)
             if i == descriptorSet2(j,2)
                 %Prune descriptors with distances that are too far
                 if (descriptorSet1(i,3) > maxDistance)
-                    break;
+                    continue;
                 end
-                unionedSet(unionedSetIndex, :) = descriptorSet1(i, :);
-                unionedSetIndex = unionedSetIndex + 1;
-                break;
+                if (descriptorSet1(i,3) < currentBestDistance)
+                    currentBestPairing = descriptorSet1(i, :);
+                    currentBestDistance = descriptorSet1(i,3);
+                end
             end
+        end
+        if (currentBestDistance <= maxDistance)
+            unionedSetTemp(unionedSetTempIndex, :) = currentBestPairing;
+            unionedSetTempIndex = unionedSetTempIndex + 1;
+        end
+    end
+    
+    unionedSet = [];
+    unionedSetIndex = 1;
+    %Remove duplicate entries from column 2
+    for k = 1:size(unionedSetTemp, 1)
+        currentPairedIndex = unionedSetTemp(k, 2);
+        currentPairedDistance = unionedSetTemp(k,3);
+        currentPairing = unionedSetTemp(k,:);
+        foundBetterDuplicate = false;
+        for m = 1:size(unionedSetTemp, 1)
+            if (m == k)
+                continue;
+            end
+            comparisonPairedIndex = unionedSetTemp(m,2);
+            if (comparisonPairedIndex == currentPairedIndex)
+                comparisonPairedDistance = unionedSetTemp(m,3);
+                    if (comparisonPairedDistance < currentPairedDistance)
+                        foundBetterDuplicate = true;
+                    end
+            end
+        end
+        if (foundBetterDuplicate)
+            continue;
+        else
+            unionedSet(unionedSetIndex, :) = currentPairing;
+            unionedSetIndex = unionedSetIndex + 1;
         end
     end
 end
@@ -480,7 +515,7 @@ function [canvas, keypoints1, keypoints2, C_union] = keypoint_matching(im, im2, 
     %Indices from keypoints2 are in the middle
     %Distances are on the right
     %   Feel free to change the third input to a threshold of your choice!
-    C_union = CreateUnionOfDescriptorSets(C_1, C_2, 300);
+    C_union = CreateUnionOfDescriptorSets(C_1, C_2, 250);
     
     %Remember to look up how drawing the lines will change based on the
     %wider canvas with both images...
@@ -561,8 +596,15 @@ function [canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1,
     number_of_correspondences = 4;
     for i = 1:experiments
         random_indices = randperm(size(C_union, 1), number_of_correspondences);
-        random_keypoints1 = keypoints1(C_union(random_indices,1), :);
-        random_keypoints2 = keypoints2(C_union(random_indices,2), :);
+        for j = 1:size(random_indices, 2)
+            cUnionPairing = C_union(random_indices(j), :);
+            currentIndex1 = uint8(cUnionPairing(1,1));
+            currentIndex2 = uint8(cUnionPairing(1,2));
+
+            random_keypoints1(j, :) = keypoints1(currentIndex1, :);
+            random_keypoints2(j, :) = keypoints2(currentIndex2, :);            
+        end
+
         random_extrema1 = zeros(size(im));
         random_extrema2 = zeros(size(im2));
 
