@@ -557,7 +557,7 @@ function [canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1,
     threshold_distance = 20;
     best_close_distances = 0;
 
-    experiments = 100;
+    experiments = 1000;
     number_of_correspondences = 4;
     for i = 1:experiments
         random_indices = randperm(size(C_union, 1), number_of_correspondences);
