@@ -11,8 +11,8 @@ im2 = imrotate(im2, -90);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 1 by Nick Pohwat and Andrew Grier %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-points = [545 238; 299 510; 665 896; 281 896];
-points2 = [383 258; 115 506; 443 896; 65 918];
+points = [281 896; 545 238; 299 510; 665 896];
+points2 = [65 918; 383 258; 115 506; 443 896];
 [imMarked, im2Marked, points, points2] = point_correspondences(im, im2, points, points2);
 figure('Name','Point Correspondence Side-by-Side', 'FileName','PointCorrespondence.jpg');
 imshowpair(imMarked,im2Marked,'montage');
@@ -54,7 +54,7 @@ imshow(canvas);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % QUESTION 6 by Nick Pohwat %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[best_canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1, keypoints2, C_union);
+[best_canvas, best_transformation_matrix, bestKeypoints1, bestKeypoints2] = auto_stitch(im, im2, keypoints1, keypoints2, C_union);
 figure('Name','Best Keypoint Description and Matching', 'FileName','BestKeypointMatching.jpg');
 imshow(best_canvas);
 bestStitchedImage = StitchImages(im, im2, best_transformation_matrix);
@@ -515,7 +515,7 @@ function [canvas, keypoints1, keypoints2, C_union] = keypoint_matching(im, im2, 
     %Indices from keypoints2 are in the middle
     %Distances are on the right
     %   Feel free to change the third input to a threshold of your choice!
-    C_union = CreateUnionOfDescriptorSets(C_1, C_2, 250);
+    C_union = CreateUnionOfDescriptorSets(C_1, C_2, 240);
     
     %Remember to look up how drawing the lines will change based on the
     %wider canvas with both images...
@@ -524,7 +524,7 @@ end
 
 function [keypoints, descriptors] = extract_descriptors(im, remaining_extrema)
     [extrema_height, extrema_width] = find(remaining_extrema == 1);
-    keypoints = [extrema_height, extrema_width];
+    keypoints = [extrema_width, extrema_height];
     extrema_length = length(extrema_height);
     descriptors = zeros(extrema_length, 243);
     for i = 1:extrema_length
@@ -578,18 +578,18 @@ function canvas = draw_matches(im, im2, keypoints1, keypoints2, C_union)
     canvas(1:size(im, 1), 1:size(im, 2), :) = im;
     canvas(1:size(im2, 1), size(im, 2)+1:end, :) = im2;
 
-    keypoints2(:,2) = keypoints2(:,2) + size(im, 2);
+    keypoints2(:,1) = keypoints2(:,1) + size(im, 2);
     for i = 1:size(C_union, 1)
         start_point = keypoints1(C_union(i, 1), :);
         end_point = keypoints2(C_union(i, 2), :);
-        canvas = insertShape(canvas, 'Line', [[start_point(2), start_point(1)], [end_point(2), end_point(1)]], 'Color', 'red', 'LineWidth', 2);
+        canvas = insertShape(canvas, 'Line', [[start_point(1), start_point(2)], [end_point(1), end_point(2)]], 'Color', 'red', 'LineWidth', 2);
     end
 end
 
 % 6 (10 points) Find the Transformation Matrix via RANSAC and Stitch
-function [canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1, keypoints2, C_union)
+function [canvas, best_transformation_matrix, bestKeypoints1, bestKeypoints2] = auto_stitch(im, im2, keypoints1, keypoints2, C_union)
     best_transformation_matrix = [];
-    threshold_distance = 20;
+    threshold_distance = 30;
     best_close_distances = 0;
     im_size = size(im);
     im_size2 = size(im2);
@@ -612,7 +612,7 @@ function [canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1,
         random_extrema1 = zeros(size(im));
         random_extrema2 = zeros(size(im2));
 
-        current_transformation_matrix = FindTransformationMatrixWithPoints(flip(random_keypoints1,1), flip(random_keypoints2,1));
+        current_transformation_matrix = FindTransformationMatrixWithPoints(random_keypoints1, random_keypoints2);
 
         current_close_distances = 0;
         for j = 1:size(C_union,1)
@@ -627,9 +627,11 @@ function [canvas, best_transformation_matrix] = auto_stitch(im, im2, keypoints1,
 
         if isempty(best_transformation_matrix) || current_close_distances > best_close_distances
             best_transformation_matrix = current_transformation_matrix;
+            bestKeypoints1 = random_keypoints1;
+            bestKeypoints2 = random_keypoints2;
             for j = 1:number_of_correspondences
-                random_extrema1(random_keypoints1(j,1), random_keypoints1(j,2)) = 1;
-                random_extrema2(random_keypoints2(j,1), random_keypoints2(j,2)) = 1;
+                random_extrema1(random_keypoints1(j,2), random_keypoints1(j,1)) = 1;
+                random_extrema2(random_keypoints2(j,2), random_keypoints2(j,1)) = 1;
             end
             best_random_extrema1 = random_extrema1;
             best_random_extrema2 = random_extrema2;
